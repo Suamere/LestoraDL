@@ -41,7 +41,7 @@ public final class DynamicLighting {
                 BlockPos newPos = e.first().blockPosition();
                 PosAndName oldPos = currentPositions.getOrDefault(e.first().getUUID(), new PosAndName(BlockPos.ZERO, null));
 
-                if (!newPos.equals(oldPos)) {
+                if (!newPos.equals(oldPos.position)) {
                     currentPositions.put(e.first().getUUID(), new PosAndName(newPos.immutable(), e.second()));
 
                     var level = Minecraft.getInstance().level;
@@ -100,7 +100,7 @@ public final class DynamicLighting {
             if (newVal == enabled) return;
 
             enabled = newVal;
-            if (newVal == false) {
+            if (!newVal) {
                 for (EntityPair e : registeredEntities.values()) {
                     var oldPos = currentPositions.getOrDefault(e.first().getUUID(), new PosAndName(BlockPos.ZERO, null));
 

@@ -32,11 +32,23 @@ public class DLEvents {
     private static int chunk_distance = 0;
     private static int tickCounter = 0;
 
+    private static Set<ChunkPos> previousChunks = new HashSet<>();
+    private static int lastPlayerChunkX = Integer.MIN_VALUE;
+    private static int lastPlayerChunkZ = Integer.MIN_VALUE;
+    private static int lastPlayerY = Integer.MIN_VALUE;
+    private static int clientTicks = 0;
+    private static boolean initialDelayDone = false;
+
+    private static final Map<Block, ResourceLocation> blockKeyCache = new ConcurrentHashMap<>();
+
+    public static ResourceLocation getCachedBlockKey(Block block) {
+        return blockKeyCache.computeIfAbsent(block, ForgeRegistries.BLOCKS::getKey);
+    }
+
     public static void setTickDelay(int delay) {
         tick_delay = delay;
         DynamicLighting.setEnabled(delay > 0);
     }
-
 
     public static void setChunk_distance(int distance) {
         chunk_distance = distance;
@@ -123,18 +135,6 @@ public class DLEvents {
         DynamicBlockLighting.tryRemoveBlock(event.getPos());
     }
 
-    private static final Map<Block, ResourceLocation> blockKeyCache = new ConcurrentHashMap<>();
-    public static ResourceLocation getCachedBlockKey(Block block) {
-        return blockKeyCache.computeIfAbsent(block, ForgeRegistries.BLOCKS::getKey);
-    }
-
-    private static Set<ChunkPos> previousChunks = new HashSet<>();
-    private static int lastPlayerChunkX = Integer.MIN_VALUE;
-    private static int lastPlayerChunkZ = Integer.MIN_VALUE;
-    private static int lastPlayerY = Integer.MIN_VALUE;
-    private static int clientTicks = 0;
-    private static boolean initialDelayDone = false;
-
     @SubscribeEvent
     public static void onClientTickBlocks(TickEvent.ClientTickEvent event) {
         if (!initialDelayDone) {
@@ -148,14 +148,12 @@ public class DLEvents {
         int playerChunkX = player.blockPosition().getX() >> 4;
         int playerChunkZ = player.blockPosition().getZ() >> 4;
 
-        // Only update if the player's chunk has changed
         if (playerChunkX == lastPlayerChunkX && playerChunkZ == lastPlayerChunkZ &&
                 Math.abs(player.blockPosition().getY() - lastPlayerY) < 3) return;
         lastPlayerChunkX = playerChunkX;
         lastPlayerChunkZ = playerChunkZ;
         lastPlayerY = player.blockPosition().getY();
 
-        // Build the complete set of chunks in a circular radius
         Set<ChunkPos> newChunks = new HashSet<>();
         for (int dx = -chunk_distance; dx <= chunk_distance; dx++) {
             for (int dz = -chunk_distance; dz <= chunk_distance; dz++) {
@@ -165,14 +163,12 @@ public class DLEvents {
             }
         }
 
-        // Remove blocks for any chunk that was in the previous set but is no longer in the new set.
         for (ChunkPos oldChunk : previousChunks) {
             if (!newChunks.contains(oldChunk)) {
                 removeBlocksInChunk(oldChunk.x, oldChunk.z);
             }
         }
 
-        // Scan every chunk in the new set (this includes inner chunks).
         for (ChunkPos cp : newChunks) {
             scanChunk(cp.x, cp.z, player.blockPosition().getY());
         }
@@ -184,7 +180,6 @@ public class DLEvents {
     private static void removeBlocksInChunk(int chunkX, int chunkZ) {
         int startX = chunkX << 4, endX = startX + 15;
         int startZ = chunkZ << 4, endZ = startZ + 15;
-        // Assumes DynamicBlockLighting provides a getter for its registered block positions.
         for (BlockPos pos : DynamicBlockLighting.getRegisteredBlockPositions()) {
             if (pos.getX() >= startX && pos.getX() <= endX &&
                     pos.getZ() >= startZ && pos.getZ() <= endZ) {
