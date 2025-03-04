@@ -1,8 +1,6 @@
 package com.lestora.dynamiclighting.commands;
 
-import com.lestora.dynamiclighting.DynamicLighting;
 import com.lestora.dynamiclighting.events.DLEvents;
-import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.client.Minecraft;
@@ -24,34 +22,18 @@ public class DLCommands {
     public static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
         var root = Commands.literal("lestora");
 
-        registerDynamicLighting(root);
         registerWhatAmIHolding(root);
         registerFixNearby(root);
         registerEfficiency(root);
+        registerChunkDistance(root);
 
         event.getDispatcher().register(root);
-    }
-
-    private static void registerDynamicLighting(LiteralArgumentBuilder<CommandSourceStack> root) {
-        root.then(Commands.literal("dynamicLighting")
-                .executes(ctx -> {
-                    DynamicLighting.setEnabled(true);
-                    return 1;
-                })
-                .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> {
-                            boolean value = BoolArgumentType.getBool(ctx, "value");
-                            DynamicLighting.setEnabled(value);
-                            return 1;
-                        })
-                )
-        );
     }
 
     private static void registerEfficiency(LiteralArgumentBuilder<CommandSourceStack> root) {
         root.then(Commands.literal("dynamicLighting")
             .then(Commands.literal("efficiency")
-                .then(Commands.argument("value", IntegerArgumentType.integer(1, 100))
+                .then(Commands.argument("value", IntegerArgumentType.integer(0, 100))
                         .executes(ctx -> {
                             int value = IntegerArgumentType.getInteger(ctx, "value");
                             DLEvents.setTickDelay(value);
@@ -59,6 +41,19 @@ public class DLCommands {
                         })
                 )
         ));
+    }
+
+    private static void registerChunkDistance(LiteralArgumentBuilder<CommandSourceStack> root) {
+        root.then(Commands.literal("dynamicLighting")
+                .then(Commands.literal("chunkDistance")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(0, 10))
+                                .executes(ctx -> {
+                                    int value = IntegerArgumentType.getInteger(ctx, "value");
+                                    DLEvents.setChunk_distance(value);
+                                    return 1;
+                                })
+                        )
+                ));
     }
 
     private static void registerWhatAmIHolding(LiteralArgumentBuilder<CommandSourceStack> root) {

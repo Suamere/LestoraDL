@@ -17,7 +17,7 @@ public class ConfigLighting {
         builder.push("light_levels");
         LIGHT_LEVELS = builder.comment("List of item=light level pairs")
                 .defineList("items",
-                        Arrays.asList("minecraft:torch=14", "minecraft:lava_bucket=10", "minecraft:glowstone=8"),
+                        Arrays.asList("minecraft:torch=14", "minecraft:lava_bucket=10", "minecraft:glowstone=15"),
                         o -> o instanceof String && ((String)o).contains("="));
         builder.pop();
         LIGHTING_CONFIG = builder.build();

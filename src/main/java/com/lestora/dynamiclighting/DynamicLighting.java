@@ -37,7 +37,7 @@ public final class DynamicLighting {
         lock.lock();
         try {
             for (Map.Entry<UUID, EntityPair> entry : registeredEntities.entrySet()) {
-                var e = entry.getValue();
+                EntityPair e = entry.getValue();
                 BlockPos newPos = e.first().blockPosition();
                 PosAndName oldPos = currentPositions.getOrDefault(e.first().getUUID(), new PosAndName(BlockPos.ZERO, null));
 
