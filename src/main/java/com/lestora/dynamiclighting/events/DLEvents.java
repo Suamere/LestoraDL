@@ -1,5 +1,6 @@
 package com.lestora.dynamiclighting.events;
 
+import com.lestora.config.LestoraConfig;
 import com.lestora.dynamiclighting.DynamicBlockLighting;
 import com.lestora.dynamiclighting.DynamicLighting;
 import net.minecraft.client.Minecraft;
@@ -70,11 +71,11 @@ public class DLEvents {
             for (Player player : level.players()) {
                 var mainStack = player.getMainHandItem();
                 ResourceLocation mhi = getCachedItemKey(mainStack.getItem());
-                Integer mhr = (mhi != null) ? ConfigEvents.getLightLevel(mhi) : null;
+                Integer mhr = (mhi != null) ? LestoraConfig.getLightLevel(mhi, 0) : null;
 
                 var offStack = player.getOffhandItem();
                 ResourceLocation ohi = getCachedItemKey(offStack.getItem());
-                Integer ohr = (ohi != null) ? ConfigEvents.getLightLevel(ohi) : null;
+                Integer ohr = (ohi != null) ? LestoraConfig.getLightLevel(ohi, 0) : null;
 
                 ResourceLocation resourceLocation = null;
                 if (mhr != null && ohr != null)  resourceLocation = (mhr > ohr) ? mhi : ohi;
@@ -106,7 +107,7 @@ public class DLEvents {
         if (event.getEntity() instanceof ItemEntity itemEntity) {
             Minecraft.getInstance().execute(() -> {
                 var resourceLocation = ForgeRegistries.ITEMS.getKey(itemEntity.getItem().getItem());
-                var lightLevel = ConfigEvents.getLightLevel(resourceLocation);
+                var lightLevel = LestoraConfig.getLightLevel(resourceLocation, 0);
                 if (lightLevel != null) {
                     DynamicLighting.tryAddEntity(itemEntity, resourceLocation);
                 }
@@ -124,7 +125,7 @@ public class DLEvents {
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
         if (event.getLevel().isClientSide()) return;
         ResourceLocation rl = ForgeRegistries.BLOCKS.getKey(event.getPlacedBlock().getBlock());
-        Integer lightLevel = (rl != null) ? ConfigEvents.getLightLevel(rl) : null;
+        Integer lightLevel = (rl != null) ? LestoraConfig.getLightLevel(rl, 0) : null;
         if (lightLevel != null)
             DynamicBlockLighting.tryAddBlock(event.getPos(), rl);
     }
@@ -199,7 +200,7 @@ public class DLEvents {
                     BlockPos pos = new BlockPos(x, y, z);
                     var state = level.getBlockState(pos);
                     ResourceLocation rl = getCachedBlockKey(state.getBlock());
-                    if (rl != null && ConfigEvents.getLightLevel(rl) != null)
+                    if (rl != null && LestoraConfig.getLightLevel(rl, 0) != null)
                         DynamicBlockLighting.tryAddBlock(pos, rl);
                 }
     }

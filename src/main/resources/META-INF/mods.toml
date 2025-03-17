@@ -10,13 +10,12 @@ displayName="${mod_name}" #mandatory
 authors="${mod_authors}" #optional
 description='''${mod_description}'''
 
-[[mods.config]]
-type="forge"
-file="lestora-lighting.toml"
-
-[[mods.config]]
-type="forge"
-file="lestora-biome.toml"
+[[dependencies.lestora_config]]
+modId="lestora_config"
+mandatory=true
+versionRange="[1.1.1,)"
+ordering="NONE"
+side="BOTH"
 
 [[dependencies.${mod_id}]]
     modId="forge"

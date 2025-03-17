@@ -1,7 +1,7 @@
 package com.lestora.dynamiclighting.mixin;
 
+import com.lestora.config.LestoraConfig;
 import com.lestora.dynamiclighting.DynamicBlockLighting;
-import com.lestora.dynamiclighting.events.ConfigEvents;
 import com.lestora.dynamiclighting.DynamicLighting;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.lighting.BlockLightEngine;
@@ -28,7 +28,7 @@ public abstract class LightTextureMixin {
         if (DynamicLighting.getEnabled()) {
             for (var currentPos : DynamicLighting.getCurrentPositions()) {
                 if (pos == currentPos.position().asLong()) {
-                    var lightLevel = ConfigEvents.getLightLevel(currentPos.resource());
+                    var lightLevel = LestoraConfig.getLightLevel(currentPos.resource(), 0);
                     if (lightLevel != null) { return lightLevel; }
                 }
             }
@@ -36,7 +36,7 @@ public abstract class LightTextureMixin {
         if (DynamicBlockLighting.getEnabled()) {
             for (var currentPos : DynamicBlockLighting.getCurrentPositions()) {
                 if (pos == currentPos.position().asLong()) {
-                    var lightLevel = ConfigEvents.getLightLevel(currentPos.resource());
+                    var lightLevel = LestoraConfig.getLightLevel(currentPos.resource(), 0);
                     if (lightLevel != null) { return lightLevel; }
                 }
             }

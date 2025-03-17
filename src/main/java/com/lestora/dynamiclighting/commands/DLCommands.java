@@ -22,7 +22,6 @@ public class DLCommands {
     public static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
         var root = Commands.literal("lestora");
 
-        registerWhatAmIHolding(root);
         registerFixNearby(root);
         registerEfficiency(root);
         registerChunkDistance(root);
@@ -54,32 +53,6 @@ public class DLCommands {
                                 })
                         )
                 ));
-    }
-
-    private static void registerWhatAmIHolding(LiteralArgumentBuilder<CommandSourceStack> root) {
-        root.then(Commands.literal("dynamicLighting")
-            .then(Commands.literal("whatAmIHolding")
-                .executes(ctx -> {
-                    var player = Minecraft.getInstance().player;
-                    if (player == null) {
-                        ctx.getSource().sendFailure(Component.literal("This command can only be run by a player."));
-                        return 0;
-                    }
-
-                    var mainStack = player.getMainHandItem();
-                    var offStack = player.getOffhandItem();
-
-                    var mainRL = ForgeRegistries.ITEMS.getKey(mainStack.getItem());
-                    var offRL = ForgeRegistries.ITEMS.getKey(offStack.getItem());
-
-                    String mainMsg = "Main Hand: " + (mainRL != null ? mainRL.toString() : "Empty");
-                    String offMsg = "Off Hand: " + (offRL != null ? offRL.toString() : "Empty");
-
-                    ctx.getSource().sendSuccess(() -> Component.literal(mainMsg), false);
-                    ctx.getSource().sendSuccess(() -> Component.literal(offMsg), false);
-                    return 1;
-                })
-        ));
     }
 
     private static void registerFixNearby(LiteralArgumentBuilder<CommandSourceStack> root) {
