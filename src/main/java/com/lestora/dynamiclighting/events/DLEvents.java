@@ -1,8 +1,10 @@
 package com.lestora.dynamiclighting.events;
 
-import com.lestora.config.LestoraConfig;
 import com.lestora.dynamiclighting.DynamicBlockLighting;
 import com.lestora.dynamiclighting.DynamicLighting;
+import com.lestora.dynamiclighting.LestoraDLMod;
+import com.lestora.dynamiclighting.LightingUpdateManager;
+import com.lestora.dynamiclighting.config.RealConfigHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -19,10 +21,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Mod.EventBusSubscriber
@@ -30,15 +29,11 @@ public class DLEvents {
     private static final Map<Item, ResourceLocation> itemKeyCache = new ConcurrentHashMap<>();
     private static final Map<UUID, ResourceLocation> previousTorchState = new ConcurrentHashMap<>();
     private static int tick_delay = 5;
-    private static int chunk_distance = 0;
     private static int tickCounter = 0;
 
-    private static Set<ChunkPos> previousChunks = new HashSet<>();
-    private static int lastPlayerChunkX = Integer.MIN_VALUE;
-    private static int lastPlayerChunkZ = Integer.MIN_VALUE;
-    private static int lastPlayerY = Integer.MIN_VALUE;
-    private static int clientTicks = 0;
-    private static boolean initialDelayDone = false;
+    public static Set<ChunkPos> previousChunks = new HashSet<>();
+//    private static int clientTicks = 0;
+//    private static boolean initialDelayDone = false;
 
     private static final Map<Block, ResourceLocation> blockKeyCache = new ConcurrentHashMap<>();
 
@@ -51,9 +46,8 @@ public class DLEvents {
         DynamicLighting.setEnabled(delay > 0);
     }
 
-    public static void setChunk_distance(int distance) {
-        chunk_distance = distance;
-        DynamicBlockLighting.setEnabled(distance > 0);
+    public static void enableBlocks(boolean enable) {
+        DynamicBlockLighting.setEnabled(enable);
     }
 
     public static ResourceLocation getCachedItemKey(Item item) {
@@ -64,18 +58,19 @@ public class DLEvents {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (++tickCounter % tick_delay != 0) return;
 
+        var localPlayer = Minecraft.getInstance().player;
         var level = Minecraft.getInstance().level;
-        if (level == null) return;
+        if (localPlayer == null || level == null) return;
 
         if (DynamicLighting.getEnabled()) {
             for (Player player : level.players()) {
                 var mainStack = player.getMainHandItem();
                 ResourceLocation mhi = getCachedItemKey(mainStack.getItem());
-                Integer mhr = (mhi != null) ? LestoraConfig.getLightLevel(mhi, 0) : null;
+                Integer mhr = (mhi != null) ? LestoraDLMod.getMinLightLevel.apply(mhi, false) : null;
 
                 var offStack = player.getOffhandItem();
                 ResourceLocation ohi = getCachedItemKey(offStack.getItem());
-                Integer ohr = (ohi != null) ? LestoraConfig.getLightLevel(ohi, 0) : null;
+                Integer ohr = (ohi != null) ? LestoraDLMod.getMinLightLevel.apply(ohi, false) : null;
 
                 ResourceLocation resourceLocation = null;
                 if (mhr != null && ohr != null)  resourceLocation = (mhr > ohr) ? mhi : ohi;
@@ -98,8 +93,67 @@ public class DLEvents {
             }
             DynamicLighting.tryUpdateEntityPositions();
         }
-    }
 
+
+//        if (!initialDelayDone) {
+//            clientTicks++;
+//            if (clientTicks < 100) return;
+//            initialDelayDone = true;
+//        }
+
+
+        if (DynamicBlockLighting.getEnabled() && LestoraDLMod.configLoaded) {
+            if (tickCounter % 100 == 0){
+                RealConfigHandler.updateBlockMap();
+                DLEvents.previousChunks.clear();
+                LightingUpdateManager.pendingSubChunkScans.clear();
+            }
+            LightingUpdateManager.processPendingScans(localPlayer);
+            // Cache player position
+            var playerPos = localPlayer.blockPosition();
+            int playerChunkX = playerPos.getX() >> 4;
+            int playerChunkZ = playerPos.getZ() >> 4;
+            int playerY = playerPos.getY();
+
+            // Retrieve the player's render distance (in chunks) and compute squared distance
+            int renderDistance = 5; //Minecraft.getInstance().options.renderDistance().get();
+            int renderDistanceSq = renderDistance * renderDistance;
+
+            // Determine new chunks based on chunk_distance.
+            Set<ChunkPos> currentChunks = new HashSet<>();
+            for (int dx = -renderDistance; dx <= renderDistance; dx++) {
+                for (int dz = -renderDistance; dz <= renderDistance; dz++) {
+                    if ((dx * dx + dz * dz) <= renderDistanceSq) {
+                        currentChunks.add(new ChunkPos(playerChunkX + dx, playerChunkZ + dz));
+                    }
+                }
+            }
+
+            // Remove blocks for chunks that are beyond the player's render distance.
+            for (ChunkPos oldChunk : previousChunks) {
+                int dx = oldChunk.x - playerChunkX;
+                int dz = oldChunk.z - playerChunkZ;
+                if ((dx * dx + dz * dz) > renderDistanceSq) {
+                    removeBlocksInChunk(oldChunk.x, oldChunk.z);
+                }
+            }
+
+            var yChange = false;
+            if (playerY - previousPlayerY > 16) {
+                yChange = true;
+                previousPlayerY = playerY;
+            }
+            // Queue up new chunks that weren't previously scanned.
+            for (ChunkPos cp : currentChunks) {
+                if (yChange || !previousChunks.contains(cp)) {
+                    LightingUpdateManager.queueChunkScan(cp, playerY);
+                }
+            }
+
+            previousChunks = currentChunks;
+        }
+    }
+    private static int previousPlayerY = Integer.MIN_VALUE;
 
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
@@ -107,7 +161,7 @@ public class DLEvents {
         if (event.getEntity() instanceof ItemEntity itemEntity) {
             Minecraft.getInstance().execute(() -> {
                 var resourceLocation = ForgeRegistries.ITEMS.getKey(itemEntity.getItem().getItem());
-                var lightLevel = LestoraConfig.getLightLevel(resourceLocation, 0);
+                var lightLevel = LestoraDLMod.getMinLightLevel.apply(resourceLocation, false);
                 if (lightLevel != null) {
                     DynamicLighting.tryAddEntity(itemEntity, resourceLocation);
                 }
@@ -123,58 +177,22 @@ public class DLEvents {
 
     @SubscribeEvent
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
-        if (event.getLevel().isClientSide()) return;
+        if (event.getLevel().isClientSide() || !LestoraDLMod.configLoaded) return;
         ResourceLocation rl = ForgeRegistries.BLOCKS.getKey(event.getPlacedBlock().getBlock());
-        Integer lightLevel = (rl != null) ? LestoraConfig.getLightLevel(rl, 0) : null;
-        if (lightLevel != null)
-            DynamicBlockLighting.tryAddBlock(event.getPos(), rl);
+        Integer lightLevel = (rl != null) ? LestoraDLMod.getMaxLightLevel.apply(rl, true) : null;
+        if (lightLevel != null) {
+            // Add block to dynamic lighting.
+            DynamicBlockLighting.tryAddBlock(event.getPos(), rl, lightLevel);
+        }
     }
 
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
-        if (event.getLevel().isClientSide()) return;
+        if (event.getLevel().isClientSide() || !LestoraDLMod.configLoaded) return;
+        // Remove block from dynamic lighting.
         DynamicBlockLighting.tryRemoveBlock(event.getPos());
-    }
-
-    @SubscribeEvent
-    public static void onClientTickBlocks(TickEvent.ClientTickEvent event) {
-        if (!initialDelayDone) {
-            clientTicks++;
-            if (clientTicks < 100) return;
-            initialDelayDone = true;
-        }
-        var player = Minecraft.getInstance().player;
-        var level = Minecraft.getInstance().level;
-        if (player == null || level == null) return;
-        int playerChunkX = player.blockPosition().getX() >> 4;
-        int playerChunkZ = player.blockPosition().getZ() >> 4;
-
-        if (playerChunkX == lastPlayerChunkX && playerChunkZ == lastPlayerChunkZ &&
-                Math.abs(player.blockPosition().getY() - lastPlayerY) < 3) return;
-        lastPlayerChunkX = playerChunkX;
-        lastPlayerChunkZ = playerChunkZ;
-        lastPlayerY = player.blockPosition().getY();
-
-        Set<ChunkPos> newChunks = new HashSet<>();
-        for (int dx = -chunk_distance; dx <= chunk_distance; dx++) {
-            for (int dz = -chunk_distance; dz <= chunk_distance; dz++) {
-                if (Math.sqrt(dx * dx + dz * dz) <= chunk_distance) {
-                    newChunks.add(new ChunkPos(playerChunkX + dx, playerChunkZ + dz));
-                }
-            }
-        }
-
-        for (ChunkPos oldChunk : previousChunks) {
-            if (!newChunks.contains(oldChunk)) {
-                removeBlocksInChunk(oldChunk.x, oldChunk.z);
-            }
-        }
-
-        for (ChunkPos cp : newChunks) {
-            scanChunk(cp.x, cp.z, player.blockPosition().getY());
-        }
-
-        previousChunks = newChunks;
+        // Immediately remove it from the cache.
+        DynamicBlockLighting.removeBlockCache(event.getPos());
     }
 
     // Helper method to remove blocks in a given chunk
@@ -182,26 +200,31 @@ public class DLEvents {
         int startX = chunkX << 4, endX = startX + 15;
         int startZ = chunkZ << 4, endZ = startZ + 15;
         for (BlockPos pos : DynamicBlockLighting.getRegisteredBlockPositions()) {
-            if (pos.getX() >= startX && pos.getX() <= endX &&
-                    pos.getZ() >= startZ && pos.getZ() <= endZ) {
+            if (pos.getX() >= startX && pos.getX() <= endX && pos.getZ() >= startZ && pos.getZ() <= endZ) {
                 DynamicBlockLighting.tryRemoveBlock(pos);
             }
         }
     }
 
-    private static void scanChunk(int chunkX, int chunkZ, int playerY) {
+    public static void scanChunk(int chunkX, int chunkZ, int startY) {
         var level = Minecraft.getInstance().level;
         if (level == null) return;
         int startX = chunkX << 4, startZ = chunkZ << 4;
-        int minY = playerY - 16, maxY = playerY + 16;
-        for (int x = startX; x < startX + 16; x++)
-            for (int z = startZ; z < startZ + 16; z++)
-                for (int y = minY; y <= maxY; y++) {
-                    BlockPos pos = new BlockPos(x, y, z);
-                    var state = level.getBlockState(pos);
-                    ResourceLocation rl = getCachedBlockKey(state.getBlock());
-                    if (rl != null && LestoraConfig.getLightLevel(rl, 0) != null)
-                        DynamicBlockLighting.tryAddBlock(pos, rl);
+
+        try {
+            for (int x = startX; x < startX + 16; x++) {
+                for (int z = startZ; z < startZ + 16; z++) {
+                    for (int y = startY; y <= startY + 16; y++) {
+                        BlockPos pos = new BlockPos(x, y, z);
+                        var state = level.getBlockState(pos);
+                        ResourceLocation rl = getCachedBlockKey(state.getBlock());
+                        var lightLevel = LestoraDLMod.getMaxLightLevel.apply(rl, true);
+                        if (rl != null && lightLevel != null) {
+                            DynamicBlockLighting.tryAddBlock(pos, rl, lightLevel);
+                        }
+                    }
                 }
+            }
+        } catch (Exception ignored) { }
     }
 }

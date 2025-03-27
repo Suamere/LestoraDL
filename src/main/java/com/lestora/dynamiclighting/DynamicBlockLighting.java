@@ -15,24 +15,32 @@ import java.util.concurrent.locks.ReentrantLock;
 public final class DynamicBlockLighting {
     public record PosAndName(BlockPos position, ResourceLocation resource) {}
 
-    private static boolean enabled = false;
+    private static boolean enabled = true;
     private static final Lock lock = new ReentrantLock();
-    private static final ConcurrentHashMap<BlockPos, PosAndName> currentPositions = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<BlockPos, ResourceLocation> registeredBlocks = new ConcurrentHashMap<>();
+    // Add these near your other static fields:
+    private static final ConcurrentHashMap<Long, Integer> blockLightCache = new ConcurrentHashMap<>();
 
-    public static boolean getEnabled() { return enabled; }
-
-    public static void setEnabled(boolean newVal) {
+    // Call this method to remove a block from the cache.
+    public static void removeBlockCache(BlockPos pos) {
         lock.lock();
         try {
-            if (newVal == enabled) return;
-            enabled = newVal;
-            var level = Minecraft.getInstance().level;
-            if (level != null) {
-                ClientChunkCache chunkSource = level.getChunkSource();
-                LevelLightEngine lightingEngine = chunkSource.getLightEngine();
-                for (BlockPos pos : registeredBlocks.keySet()) {
-                    lightingEngine.checkBlock(pos);
+            blockLightCache.remove(pos.asLong());
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // Refresh the cache when blocks update (e.g., after tryAddBlock/tryRemoveBlock):
+    public static void refreshBlockLightCache() {
+        lock.lock();
+        try {
+            blockLightCache.clear();
+            for (var entry : registeredBlocks.entrySet()) {
+                long posKey = entry.getKey().asLong();
+                Integer lightLevel = LestoraDLMod.getMaxLightLevel.apply(entry.getValue(), true);
+                if (lightLevel != null) {
+                    blockLightCache.put(posKey, lightLevel);
                 }
             }
         } finally {
@@ -40,13 +48,16 @@ public final class DynamicBlockLighting {
         }
     }
 
-    public static Collection<PosAndName> getCurrentPositions() {
-        lock.lock();
-        try {
-            return new ArrayList<>(currentPositions.values());
-        } finally {
-            lock.unlock();
-        }
+    // Getter for mixin use:
+    public static Integer getBlockLightLevel(long pos) {
+        return blockLightCache.get(pos);
+    }
+
+
+    public static boolean getEnabled() { return enabled; }
+
+    public static void setEnabled(boolean newVal) {
+        enabled = newVal;
     }
 
     public static Collection<BlockPos> getRegisteredBlockPositions() {
@@ -58,7 +69,7 @@ public final class DynamicBlockLighting {
         }
     }
 
-    public static void tryAddBlock(BlockPos pos, ResourceLocation resource) {
+    public static void tryAddBlock(BlockPos pos, ResourceLocation resource, int lightLevel) {
         lock.lock();
         try {
             var level = Minecraft.getInstance().level;
@@ -74,7 +85,7 @@ public final class DynamicBlockLighting {
                 if (allOcclude) return;
             }
             registeredBlocks.put(pos, resource);
-            currentPositions.put(pos, new PosAndName(pos, resource));
+            blockLightCache.put(pos.asLong(), lightLevel);
             if (level != null) {
                 ClientChunkCache chunkSource = level.getChunkSource();
                 LevelLightEngine lightingEngine = chunkSource.getLightEngine();
@@ -85,11 +96,28 @@ public final class DynamicBlockLighting {
         }
     }
 
+    public static void removeAll() {
+        lock.lock();
+        try {
+            var level = Minecraft.getInstance().level;
+            for (var oldPos : registeredBlocks.entrySet()) {
+                if (level != null) {
+                    ClientChunkCache chunkSource = level.getChunkSource();
+                    LevelLightEngine lightingEngine = chunkSource.getLightEngine();
+                    lightingEngine.checkBlock(oldPos.getKey());
+                }
+            }
+            registeredBlocks.clear();
+        } finally {
+            lock.unlock();
+        }
+        refreshBlockLightCache();
+    }
+
     public static void tryRemoveBlock(BlockPos pos) {
         lock.lock();
         try {
             registeredBlocks.remove(pos);
-            currentPositions.remove(pos);
             var level = Minecraft.getInstance().level;
             if (level != null) {
                 ClientChunkCache chunkSource = level.getChunkSource();
@@ -99,5 +127,6 @@ public final class DynamicBlockLighting {
         } finally {
             lock.unlock();
         }
+        refreshBlockLightCache();
     }
 }

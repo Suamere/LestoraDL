@@ -24,6 +24,30 @@ public final class DynamicLighting {
     private static final ConcurrentHashMap<UUID, PosAndName> currentPositions = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<UUID, EntityPair> registeredEntities = new ConcurrentHashMap<>();
 
+    private static final ConcurrentHashMap<Long, Integer> dynamicLightCache = new ConcurrentHashMap<>();
+
+    // Call this method periodically (e.g., at the end of tryUpdateEntityPositions or on a timer) to refresh the cache.
+    public static void refreshDynamicLightCache() {
+        lock.lock();
+        try {
+            dynamicLightCache.clear();
+            for (var entry : registeredEntities.entrySet()) {
+                Entity e = entry.getValue().first();
+                ResourceLocation resource = entry.getValue().second();
+                Integer lightLevel = LestoraDLMod.getMinLightLevel.apply(resource, false);
+                if (lightLevel != null) {
+                    dynamicLightCache.put(e.blockPosition().asLong(), lightLevel);
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public static Integer getDynamicLightLevel(long pos) {
+        return dynamicLightCache.get(pos);
+    }
+
     public static Collection<PosAndName> getCurrentPositions() {
         lock.lock();
         try {
@@ -56,6 +80,7 @@ public final class DynamicLighting {
         } finally {
             lock.unlock();
         }
+        refreshDynamicLightCache();
     }
 
     public static void tryAddEntity(Entity e, ResourceLocation resource) {
@@ -72,6 +97,26 @@ public final class DynamicLighting {
         } finally {
             lock.unlock();
         }
+        refreshDynamicLightCache();
+    }
+
+    public static void removeAll() {
+        lock.lock();
+        try {
+            var level = Minecraft.getInstance().level;
+            registeredEntities.clear();
+            for (var oldPos : currentPositions.entrySet()) {
+                if (level != null) {
+                    ClientChunkCache chunkSource = level.getChunkSource();
+                    LevelLightEngine lightingEngine = chunkSource.getLightEngine();
+                    lightingEngine.checkBlock(oldPos.getValue().position);
+                }
+            }
+            currentPositions.clear();
+        } finally {
+            lock.unlock();
+        }
+        refreshDynamicLightCache();
     }
 
     public static void tryRemoveEntity(Entity e) {
@@ -88,6 +133,7 @@ public final class DynamicLighting {
         } finally {
             lock.unlock();
         }
+        refreshDynamicLightCache();
     }
 
     public static boolean getEnabled() {

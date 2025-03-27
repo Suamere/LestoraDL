@@ -87,7 +87,7 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor "org.spongepowered:mixin:0.8.7:processor"
-    implementation fg.deobf(files("libs/lestora_config-1.1.1.jar"))
+    implementation fg.deobf(files("libs/lestora_config-1.1.4.jar"))
 }
 
 mixin {

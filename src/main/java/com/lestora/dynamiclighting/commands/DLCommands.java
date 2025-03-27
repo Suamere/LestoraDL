@@ -1,19 +1,21 @@
 package com.lestora.dynamiclighting.commands;
 
+import com.lestora.dynamiclighting.DynamicBlockLighting;
+import com.lestora.dynamiclighting.LightingUpdateManager;
+import com.lestora.dynamiclighting.config.RealConfigHandler;
 import com.lestora.dynamiclighting.events.DLEvents;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
 
 @Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DLCommands {
@@ -44,11 +46,11 @@ public class DLCommands {
 
     private static void registerChunkDistance(LiteralArgumentBuilder<CommandSourceStack> root) {
         root.then(Commands.literal("dynamicLighting")
-                .then(Commands.literal("chunkDistance")
-                        .then(Commands.argument("value", IntegerArgumentType.integer(0, 10))
+                .then(Commands.literal("blocksEnabled")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
                                 .executes(ctx -> {
-                                    int value = IntegerArgumentType.getInteger(ctx, "value");
-                                    DLEvents.setChunk_distance(value);
+                                    boolean value = BoolArgumentType.getBool(ctx, "enabled");
+                                    DLEvents.enableBlocks(value);
                                     return 1;
                                 })
                         )
