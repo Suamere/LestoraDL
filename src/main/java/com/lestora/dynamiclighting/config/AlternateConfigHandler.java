@@ -41,12 +41,12 @@ public class AlternateConfigHandler {
     }
 
     // Returns a BiFunction that looks up a ResourceLocation directly in the PRIORITY_MAP.
-    public static BiFunction<ResourceLocation, Boolean, Integer> getMinLightLevelFunc() {
-        return (rl, forBlocks) -> (rl == null) ? 0 : PRIORITY_MAP.getOrDefault(rl, 0);
+    public static Function<ResourceLocation, Integer> getMinLightLevelFunc() {
+        return (rl) -> (rl == null) ? 0 : PRIORITY_MAP.getOrDefault(rl, 0);
     }
 
     // Returns a BiFunction that looks up a ResourceLocation directly in the PRIORITY_MAP.
-    public static BiFunction<ResourceLocation, Boolean, Integer> getMaxLightLevelFunc() {
-        return (rl, forBlocks) -> (rl == null) ? 0 : PRIORITY_MAP.getOrDefault(rl, 0);
+    public static Function<ResourceLocation, Integer> getMaxLightLevelFunc() {
+        return (rl) -> (rl == null) ? 0 : PRIORITY_MAP.getOrDefault(rl, 0);
     }
 }

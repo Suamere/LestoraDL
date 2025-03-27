@@ -34,7 +34,7 @@ public final class DynamicLighting {
             for (var entry : registeredEntities.entrySet()) {
                 Entity e = entry.getValue().first();
                 ResourceLocation resource = entry.getValue().second();
-                Integer lightLevel = LestoraDLMod.getMinLightLevel.apply(resource, false);
+                Integer lightLevel = LestoraDLMod.getEntityLightLevel.apply(resource);
                 if (lightLevel != null) {
                     dynamicLightCache.put(e.blockPosition().asLong(), lightLevel);
                 }

@@ -38,7 +38,7 @@ public final class DynamicBlockLighting {
             blockLightCache.clear();
             for (var entry : registeredBlocks.entrySet()) {
                 long posKey = entry.getKey().asLong();
-                Integer lightLevel = LestoraDLMod.getMaxLightLevel.apply(entry.getValue(), true);
+                Integer lightLevel = LestoraDLMod.getBlockLightLevel.apply(entry.getValue());
                 if (lightLevel != null) {
                     blockLightCache.put(posKey, lightLevel);
                 }
