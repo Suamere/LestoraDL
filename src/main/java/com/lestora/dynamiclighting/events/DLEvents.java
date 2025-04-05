@@ -67,35 +67,6 @@ public class DLEvents {
         return itemKeyCache.computeIfAbsent(item, ForgeRegistries.ITEMS::getKey);
     }
 
-//    @SubscribeEvent
-//    public static void onChunkLoad(ChunkEvent.Load event) {
-//        // This handler runs on both sides; if you're only doing dynamic lighting client-side:
-//        if (!event.getLevel().isClientSide()) return;
-//        ChunkAccess chunk = event.getChunk();
-//        var level = Minecraft.getInstance().level;
-//        if (level == null) return;
-//
-//        // Option 1: brute-force update every block in the chunk.
-//        int startX = chunk.getPos().x << 4;
-//        int startZ = chunk.getPos().z << 4;
-//        // You might limit Y to the known range of dynamic lights.
-//        for (int x = startX; x < startX + 16; x++) {
-//            for (int y = -60; y < level.getHeight(); y++) {
-//                for (int z = startZ; z < startZ + 16; z++) {
-//                    BlockPos pos = new BlockPos(x, y, z);
-//                    level.getChunkSource().getLightEngine().checkBlock(pos);
-//                }
-//            }
-//        }
-//        // Option 2 (preferred for performance):
-//        // Iterate only over your mod's registered positions that fall inside this chunk.
-//        // for (BlockPos pos : DynamicBlockLighting.getRegisteredBlockPositions()) {
-//        //     if (pos.getX() >= startX && pos.getX() < startX+16 && pos.getZ() >= startZ && pos.getZ() < startZ+16) {
-//        //         level.getChunkSource().getLightEngine().checkBlock(pos);
-//        //     }
-//        // }
-//    }
-
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         tickCounter++;

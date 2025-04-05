@@ -1,11 +1,13 @@
 package com.lestora.dynamiclighting;
 
+import com.lestora.dynamiclighting.models.PendingCheck;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.core.BlockPos;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.TickEvent.ServerTickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.server.ServerLifecycleHooks;
+
 import java.util.Iterator;
 
 @Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.FORGE)
@@ -14,16 +16,15 @@ public class ServerLightUpdater {
     public static void onServerTick(ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
 
-        var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        var server = ServerLifecycleHooks.getCurrentServer();
         if (server == null) return;
 
-        ServerLevel overworld = server.getLevel(net.minecraft.world.level.Level.OVERWORLD);
-        if (overworld == null) return;
-
-        Iterator<BlockPos> it = LestoraDLMod.pendingCheckPositions.iterator();
+        Iterator<PendingCheck> it = LestoraDLMod.pendingCheckPositions.iterator();
         while (it.hasNext()) {
-            BlockPos pos = it.next();
-            overworld.getChunkSource().getLightEngine().checkBlock(pos);
+            PendingCheck pending = it.next();
+            ServerLevel level = server.getLevel(pending.dimension());
+            if (level != null)
+                level.getChunkSource().getLightEngine().checkBlock(pending.pos());
 
             //Integer levelValue = DynamicBlockLighting.getBlockLightLevel(pos.asLong());
             //if (levelValue == null || levelValue == 0) {

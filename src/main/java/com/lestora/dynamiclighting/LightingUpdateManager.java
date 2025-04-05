@@ -4,6 +4,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.lestora.dynamiclighting.models.SubChunkPos;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.entity.player.Player;
 import com.lestora.dynamiclighting.events.DLEvents;
@@ -30,6 +32,7 @@ public class LightingUpdateManager {
 
         SubChunkPos closest = getClosest(playerChunkX, playerChunkZ, playerSubChunk);
         if (closest != null) {
+            //Minecraft.getInstance().getConnection().send(new ServerboundChatCommandPacket("setblock " + (closest.chunkPos.x * 16 + 8) + " 100 " + (closest.chunkPos.z * 16 + 8) + " minecraft:sea_lantern"));
             pendingSubChunkScans.remove(closest);
             DLEvents.scanChunk(closest);
         }
@@ -38,8 +41,13 @@ public class LightingUpdateManager {
     private static @Nullable SubChunkPos getClosest(int playerChunkX, int playerChunkZ, int playerSubChunk) {
         SubChunkPos closest = null;
         double bestDistance = Double.MAX_VALUE;
-
+        var level = Minecraft.getInstance().level;
+        if (level == null) return null;
         for (SubChunkPos scp : pendingSubChunkScans) {
+            // Only consider scp if the chunk is actually loaded.
+            if (!level.hasChunk(scp.chunkPos.x, scp.chunkPos.z)) {
+                continue;
+            }
             int dx = scp.chunkPos.x - playerChunkX;
             int dz = scp.chunkPos.z - playerChunkZ;
             int verticalDiff = Math.abs((scp.startingY >> 4) - playerSubChunk);
