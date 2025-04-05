@@ -64,8 +64,15 @@ public final class DynamicLighting {
                 PosAndName oldPos = currentPositions.getOrDefault(e.first().getUUID(), new PosAndName(BlockPos.ZERO, null));
 
                 if (!newPos.equals(oldPos.position)) {
+                    // Save the new position in our tracking map.
                     currentPositions.put(e.first().getUUID(), new PosAndName(newPos.immutable(), e.second()));
-                    LestoraDLMod.checkBlock(Minecraft.getInstance().level, newPos, oldPos.position);
+                    // Update the new position normally.
+                    LestoraDLMod.checkBlock(Minecraft.getInstance().level, newPos);
+                    // And update the old position via our removal method,
+                    // so that it gets added to the pending-check cache.
+                    if (!oldPos.position.equals(BlockPos.ZERO)) {
+                        LestoraDLMod.checkBlockRemoval(Minecraft.getInstance().level, oldPos.position);
+                    }
                 }
             }
         } finally {
@@ -106,8 +113,17 @@ public final class DynamicLighting {
         try {
             registeredEntities.remove(e.getUUID());
             var oldPos = currentPositions.remove(e.getUUID());
-            if (oldPos != null)
-                LestoraDLMod.checkBlock(Minecraft.getInstance().level, oldPos.position);
+            if (oldPos != null) {
+                var level = Minecraft.getInstance().level;
+                if (level != null) {
+                    // Update the position where the entity was removed...
+                    LestoraDLMod.checkBlockRemoval(level, oldPos.position);
+                    // ...and update its neighbors to force full propagation.
+                    for (var d : net.minecraft.core.Direction.values()) {
+                        LestoraDLMod.checkBlockRemoval(level, oldPos.position.relative(d));
+                    }
+                }
+            }
         } finally {
             lock.unlock();
         }
@@ -127,7 +143,7 @@ public final class DynamicLighting {
             if (!newVal) {
                 for (EntityPair e : registeredEntities.values()) {
                     var oldPos = currentPositions.getOrDefault(e.first().getUUID(), new PosAndName(BlockPos.ZERO, null));
-                    LestoraDLMod.checkBlock(Minecraft.getInstance().level, oldPos.position);
+                    LestoraDLMod.checkBlockRemoval(Minecraft.getInstance().level, oldPos.position);
                 }
             }
             else {

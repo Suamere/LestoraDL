@@ -24,10 +24,13 @@ import net.minecraft.world.level.block.piston.PistonHeadBlock;
 import net.minecraft.world.level.block.piston.PistonBaseBlock;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -63,6 +66,35 @@ public class DLEvents {
     public static ResourceLocation getCachedItemKey(Item item) {
         return itemKeyCache.computeIfAbsent(item, ForgeRegistries.ITEMS::getKey);
     }
+
+//    @SubscribeEvent
+//    public static void onChunkLoad(ChunkEvent.Load event) {
+//        // This handler runs on both sides; if you're only doing dynamic lighting client-side:
+//        if (!event.getLevel().isClientSide()) return;
+//        ChunkAccess chunk = event.getChunk();
+//        var level = Minecraft.getInstance().level;
+//        if (level == null) return;
+//
+//        // Option 1: brute-force update every block in the chunk.
+//        int startX = chunk.getPos().x << 4;
+//        int startZ = chunk.getPos().z << 4;
+//        // You might limit Y to the known range of dynamic lights.
+//        for (int x = startX; x < startX + 16; x++) {
+//            for (int y = -60; y < level.getHeight(); y++) {
+//                for (int z = startZ; z < startZ + 16; z++) {
+//                    BlockPos pos = new BlockPos(x, y, z);
+//                    level.getChunkSource().getLightEngine().checkBlock(pos);
+//                }
+//            }
+//        }
+//        // Option 2 (preferred for performance):
+//        // Iterate only over your mod's registered positions that fall inside this chunk.
+//        // for (BlockPos pos : DynamicBlockLighting.getRegisteredBlockPositions()) {
+//        //     if (pos.getX() >= startX && pos.getX() < startX+16 && pos.getZ() >= startZ && pos.getZ() < startZ+16) {
+//        //         level.getChunkSource().getLightEngine().checkBlock(pos);
+//        //     }
+//        // }
+//    }
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {

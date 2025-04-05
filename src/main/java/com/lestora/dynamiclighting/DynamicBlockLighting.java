@@ -88,6 +88,14 @@ public final class DynamicBlockLighting {
         }
 
         refreshBlockLightCache();
-        LestoraDLMod.checkBlock(Minecraft.getInstance().level, pos);
+        var level = Minecraft.getInstance().level;
+        if (level != null) {
+            // Update the removed position
+            LestoraDLMod.checkBlockRemoval(level, pos);
+            // Force updates on all neighbors so that darkness propagates.
+            for (var d : net.minecraft.core.Direction.values()) {
+                LestoraDLMod.checkBlockRemoval(level, pos.relative(d));
+            }
+        }
     }
 }
