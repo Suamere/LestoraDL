@@ -9,12 +9,21 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.DoublePlantBlock;
+import net.minecraft.world.level.block.piston.PistonHeadBlock;
+import net.minecraft.world.level.block.piston.PistonBaseBlock;
+import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
@@ -30,6 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DLEvents {
     private static final Map<Item, ResourceLocation> itemKeyCache = new ConcurrentHashMap<>();
     private static final Map<UUID, ResourceLocation> previousTorchState = new ConcurrentHashMap<>();
+    private static final Map<FallingBlockEntity, BlockPos> fallingBlockCache = new ConcurrentHashMap<>();
     private static int tick_delay = 5;
     private static int tickCounter = 0;
 
@@ -71,6 +81,32 @@ public class DLEvents {
         }
     }
 
+    @SubscribeEvent
+    public static void onClientTick2(TickEvent.ClientTickEvent event) {
+        if (!LestoraDLMod.configLoaded) return;
+        if (event.phase != TickEvent.Phase.END) return;
+
+        for (Iterator<Map.Entry<FallingBlockEntity, BlockPos>> it = fallingBlockCache.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<FallingBlockEntity, BlockPos> entry = it.next();
+            FallingBlockEntity fallingBlock = entry.getKey();
+
+            BlockPos currentPos = fallingBlock.blockPosition();
+
+            if (fallingBlock.isRemoved() || !fallingBlock.isAlive()) {
+                ResourceLocation rl = ForgeRegistries.BLOCKS.getKey(fallingBlock.getBlockState().getBlock());
+
+                Integer lightLevel = (rl != null) ? LestoraDLMod.getEntityLightLevel.apply(rl) : null;
+                if (lightLevel != null)
+                    DynamicBlockLighting.tryAddBlock(currentPos, rl, lightLevel);
+
+                it.remove();
+            } else {
+                // Entity still falling, update the cached position.
+                entry.setValue(currentPos);
+            }
+        }
+    }
+
     private static void TickDynamicEntities(ClientLevel level) {
         if (tickCounter % tick_delay != 0) return;
         for (Player player : level.players()) {
@@ -84,8 +120,8 @@ public class DLEvents {
 
             ResourceLocation resourceLocation = null;
             if (mhr != null && ohr != null)  resourceLocation = (mhr > ohr) ? mhi : ohi;
-             else if (mhr != null) resourceLocation = mhi;
-             else if (ohr != null) resourceLocation = ohi;
+            else if (mhr != null) resourceLocation = mhi;
+            else if (ohr != null) resourceLocation = ohi;
 
             UUID uuid = player.getUUID();
             ResourceLocation previous = previousTorchState.get(uuid);
@@ -139,7 +175,6 @@ public class DLEvents {
 
         // Retrieve the player's render distance (in chunks) and compute squared distance
         int renderDistance = Minecraft.getInstance().options.renderDistance().get();
-        System.err.println("RENDER DISTANCE: " + renderDistance);
         int renderDistanceSq = renderDistance * renderDistance;
 
         // Determine new chunks based on chunk_distance.
@@ -175,7 +210,9 @@ public class DLEvents {
 
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        if (!LestoraDLMod.configLoaded) return;
         if (!event.getLevel().isClientSide()) return;
+
         if (event.getEntity() instanceof ItemEntity itemEntity) {
             Minecraft.getInstance().execute(() -> {
                 var resourceLocation = ForgeRegistries.ITEMS.getKey(itemEntity.getItem().getItem());
@@ -185,33 +222,83 @@ public class DLEvents {
                 }
             });
         }
+        if (event.getEntity() instanceof FallingBlockEntity fallingBlock) {
+            Minecraft.getInstance().execute(() -> {
+                ResourceLocation resourceLocation = ForgeRegistries.BLOCKS.getKey(fallingBlock.getBlockState().getBlock());
+                var lightLevel = LestoraDLMod.getEntityLightLevel.apply(resourceLocation);
+                if (lightLevel != null) {
+                    DynamicLighting.tryAddEntity(fallingBlock, resourceLocation);
+                }
+            });
+            BlockPos originalPos = fallingBlock.blockPosition();
+            DynamicBlockLighting.tryRemoveBlock(originalPos);
+
+            fallingBlockCache.put(fallingBlock, originalPos);
+        }
     }
+
 
     @SubscribeEvent
     public static void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
+        if (!LestoraDLMod.configLoaded) return;
         if (!event.getLevel().isClientSide()) return;
         DynamicLighting.tryRemoveEntity(event.getEntity());
     }
 
     @SubscribeEvent
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
-        if (event.getLevel().isClientSide() || !LestoraDLMod.configLoaded) return;
+        if (!LestoraDLMod.configLoaded) return;
         ResourceLocation rl = ForgeRegistries.BLOCKS.getKey(event.getPlacedBlock().getBlock());
         Integer lightLevel = (rl != null) ? LestoraDLMod.getBlockLightLevel.apply(rl) : null;
         if (lightLevel != null) {
-            // Add block to dynamic lighting.
             DynamicBlockLighting.tryAddBlock(event.getPos(), rl, lightLevel);
         }
     }
 
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
-        if (event.getLevel().isClientSide() || !LestoraDLMod.configLoaded) return;
-        // Remove block from dynamic lighting.
-        DynamicBlockLighting.tryRemoveBlock(event.getPos());
-        // Immediately remove it from the cache.
-        DynamicBlockLighting.removeBlockCache(event.getPos());
+        if (!LestoraDLMod.configLoaded) return;
+        BlockPos pos = event.getPos();
+        DynamicBlockLighting.tryRemoveBlock(pos);
+        var level = event.getLevel();
+        var state = level.getBlockState(pos);
+
+        // Handle Doors
+        if (state.getBlock() instanceof DoorBlock) {
+            boolean isLower = state.getValue(DoorBlock.HALF) == DoubleBlockHalf.LOWER;
+            BlockPos otherHalfPos = isLower ? pos.above() : pos.below();
+            DynamicBlockLighting.tryRemoveBlock(otherHalfPos);
+        }
+        // Handle Beds
+        else if (state.getBlock() instanceof BedBlock) {
+            // BedBlock has a PART property (HEAD/FOOT)
+            boolean isHead = state.getValue(BedBlock.PART) == BedPart.HEAD;
+            BlockPos otherHalfPos = isHead ? pos.below() : pos.above();
+            DynamicBlockLighting.tryRemoveBlock(otherHalfPos);
+        }
+        // Handle Double-Tall Plants (Sunflower, Lilac, Large Fern, Rose Bush, Peony, Tall-Grass)
+        else if (state.getBlock() instanceof DoublePlantBlock) {
+            boolean isLower = state.getValue(DoublePlantBlock.HALF) == DoubleBlockHalf.LOWER;
+            BlockPos otherHalfPos = isLower ? pos.above() : pos.below();
+            DynamicBlockLighting.tryRemoveBlock(otherHalfPos);
+        }
+        // Handle Extended Pistons
+        else if (state.getBlock() instanceof PistonHeadBlock) {
+            // Remove the piston base (behind the head)
+            Direction facing = state.getValue(PistonHeadBlock.FACING);
+            BlockPos pistonBasePos = pos.relative(facing.getOpposite());
+            DynamicBlockLighting.tryRemoveBlock(pistonBasePos);
+        }
+        else if (state.getBlock() instanceof PistonBaseBlock) {
+            // If the piston is extended, remove its head.
+            if (state.getValue(PistonBaseBlock.EXTENDED)) {
+                Direction facing = state.getValue(PistonBaseBlock.FACING);
+                BlockPos headPos = pos.relative(facing);
+                DynamicBlockLighting.tryRemoveBlock(headPos);
+            }
+        }
     }
+
 
     // Helper method to remove blocks in a given chunk
     private static void removeBlocksInChunk(int chunkX, int chunkZ) {

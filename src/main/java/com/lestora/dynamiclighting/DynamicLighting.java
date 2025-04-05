@@ -1,11 +1,9 @@
 package com.lestora.dynamiclighting;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.lighting.LevelLightEngine;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -67,14 +65,7 @@ public final class DynamicLighting {
 
                 if (!newPos.equals(oldPos.position)) {
                     currentPositions.put(e.first().getUUID(), new PosAndName(newPos.immutable(), e.second()));
-
-                    var level = Minecraft.getInstance().level;
-                    if (level != null) {
-                        ClientChunkCache chunkSource = level.getChunkSource();
-                        LevelLightEngine lightingEngine = chunkSource.getLightEngine();
-                        lightingEngine.checkBlock(newPos);
-                        lightingEngine.checkBlock(oldPos.position);
-                    }
+                    LestoraDLMod.checkBlock(Minecraft.getInstance().level, newPos, oldPos.position);
                 }
             }
         } finally {
@@ -86,33 +77,24 @@ public final class DynamicLighting {
     public static void tryAddEntity(Entity e, ResourceLocation resource) {
         lock.lock();
         try {
-            registeredEntities.compute(e.getUUID(), (uuid, existingPair) -> {
-                if (existingPair == null) {
-                    return new EntityPair(e, resource);
-                } else if (!existingPair.second().equals(resource)) {
-                    return new EntityPair(e, resource);
-                }
-                return existingPair;
-            });
-        } finally {
-            lock.unlock();
-        }
-        refreshDynamicLightCache();
-    }
-
-    public static void removeAll() {
-        lock.lock();
-        try {
-            var level = Minecraft.getInstance().level;
-            registeredEntities.clear();
-            for (var oldPos : currentPositions.entrySet()) {
-                if (level != null) {
-                    ClientChunkCache chunkSource = level.getChunkSource();
-                    LevelLightEngine lightingEngine = chunkSource.getLightEngine();
-                    lightingEngine.checkBlock(oldPos.getValue().position);
-                }
+            UUID uuid = e.getUUID();
+            boolean isNew = !registeredEntities.containsKey(uuid);
+            // Always record the current block position when adding the entity.
+            PosAndName initial = new PosAndName(e.blockPosition().immutable(), resource);
+            if (isNew) {
+                currentPositions.put(uuid, initial);
+                registeredEntities.put(uuid, new EntityPair(e, resource));
+                // Immediately force a light update for the entity's current position.
+                LestoraDLMod.checkBlock(Minecraft.getInstance().level, e.blockPosition());
+            } else {
+                // If already present, update resource if needed.
+                registeredEntities.compute(uuid, (id, existingPair) -> {
+                    if (existingPair == null || !existingPair.second().equals(resource)) {
+                        return new EntityPair(e, resource);
+                    }
+                    return existingPair;
+                });
             }
-            currentPositions.clear();
         } finally {
             lock.unlock();
         }
@@ -124,12 +106,8 @@ public final class DynamicLighting {
         try {
             registeredEntities.remove(e.getUUID());
             var oldPos = currentPositions.remove(e.getUUID());
-            var level = Minecraft.getInstance().level;
-            if (level != null && oldPos != null) {
-                ClientChunkCache chunkSource = level.getChunkSource();
-                LevelLightEngine lightingEngine = chunkSource.getLightEngine();
-                lightingEngine.checkBlock(oldPos.position);
-            }
+            if (oldPos != null)
+                LestoraDLMod.checkBlock(Minecraft.getInstance().level, oldPos.position);
         } finally {
             lock.unlock();
         }
@@ -149,25 +127,13 @@ public final class DynamicLighting {
             if (!newVal) {
                 for (EntityPair e : registeredEntities.values()) {
                     var oldPos = currentPositions.getOrDefault(e.first().getUUID(), new PosAndName(BlockPos.ZERO, null));
-
-                    var level = Minecraft.getInstance().level;
-                    if (level != null) {
-                        ClientChunkCache chunkSource = level.getChunkSource();
-                        LevelLightEngine lightingEngine = chunkSource.getLightEngine();
-                        lightingEngine.checkBlock(oldPos.position);
-                    }
+                    LestoraDLMod.checkBlock(Minecraft.getInstance().level, oldPos.position);
                 }
             }
             else {
                 for (EntityPair e : registeredEntities.values()) {
                     BlockPos newPos = e.first().blockPosition();
-
-                    var level = Minecraft.getInstance().level;
-                    if (level != null) {
-                        ClientChunkCache chunkSource = level.getChunkSource();
-                        LevelLightEngine lightingEngine = chunkSource.getLightEngine();
-                        lightingEngine.checkBlock(newPos);
-                    }
+                    LestoraDLMod.checkBlock(Minecraft.getInstance().level, newPos);
                 }
             }
         } finally {

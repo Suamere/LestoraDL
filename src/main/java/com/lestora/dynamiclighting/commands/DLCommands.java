@@ -1,17 +1,15 @@
 package com.lestora.dynamiclighting.commands;
 
-import com.lestora.dynamiclighting.DynamicBlockLighting;
-import com.lestora.dynamiclighting.LightingUpdateManager;
-import com.lestora.dynamiclighting.config.RealConfigHandler;
+import com.lestora.dynamiclighting.LestoraDLMod;
 import com.lestora.dynamiclighting.events.DLEvents;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -59,25 +57,27 @@ public class DLCommands {
 
     private static void registerFixNearby(LiteralArgumentBuilder<CommandSourceStack> root) {
         root.then(Commands.literal("dynamicLighting")
-            .then(Commands.literal("fixNearby")
-                .executes(ctx -> {
-                    var player = Minecraft.getInstance().player;
-                    var level = player.level();
-                    var chunkSource = level.getChunkSource();
-                    LevelLightEngine lightingEngine = chunkSource.getLightEngine();
+                .then(Commands.literal("fixNearby")
+                        .executes(ctx -> {
+                            var player = Minecraft.getInstance().player;
+                            if (player == null) return 0;
 
-                    BlockPos playerPos = player.blockPosition();
-                    for (int dx = -20; dx <= 20; dx++) {
-                        for (int dy = -20; dy <= 20; dy++) {
-                            for (int dz = -20; dz <= 20; dz++) {
-                                BlockPos pos = playerPos.offset(dx, dy, dz);
-                                lightingEngine.checkBlock(pos);
-                            }
-                        }
-                    }
+                            BlockPos playerPos = player.blockPosition();
+                            int range = 20;
+                            int sideLength = range * 2 + 1;
+                            int size = sideLength * sideLength * sideLength;
+                            BlockPos[] positions = new BlockPos[size];
+                            int index = 0;
 
-                    return 1;
-                })
-        ));
+                            for (int dx = -range; dx <= range; dx++)
+                                for (int dy = -range; dy <= range; dy++)
+                                    for (int dz = -range; dz <= range; dz++)
+                                        positions[index++] = playerPos.offset(dx, dy, dz);
+
+                            LestoraDLMod.checkBlock((ClientLevel) player.level(), positions);
+                            return 1;
+                        })
+                )
+        );
     }
 }

@@ -1,10 +1,8 @@
 package com.lestora.dynamiclighting;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.lighting.LevelLightEngine;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,23 +11,11 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public final class DynamicBlockLighting {
-    public record PosAndName(BlockPos position, ResourceLocation resource) {}
-
     private static boolean enabled = true;
     private static final Lock lock = new ReentrantLock();
     private static final ConcurrentHashMap<BlockPos, ResourceLocation> registeredBlocks = new ConcurrentHashMap<>();
     // Add these near your other static fields:
     private static final ConcurrentHashMap<Long, Integer> blockLightCache = new ConcurrentHashMap<>();
-
-    // Call this method to remove a block from the cache.
-    public static void removeBlockCache(BlockPos pos) {
-        lock.lock();
-        try {
-            blockLightCache.remove(pos.asLong());
-        } finally {
-            lock.unlock();
-        }
-    }
 
     // Refresh the cache when blocks update (e.g., after tryAddBlock/tryRemoveBlock):
     public static void refreshBlockLightCache() {
@@ -53,7 +39,6 @@ public final class DynamicBlockLighting {
         return blockLightCache.get(pos);
     }
 
-
     public static boolean getEnabled() { return enabled; }
 
     public static void setEnabled(boolean newVal) {
@@ -73,60 +58,36 @@ public final class DynamicBlockLighting {
         lock.lock();
         try {
             var level = Minecraft.getInstance().level;
-            if (level != null) {
-                boolean allOcclude = true;
-                for (var d : net.minecraft.core.Direction.values()) {
-                    BlockPos neighborPos = pos.relative(d);
-                    if (!level.getBlockState(neighborPos).canOcclude()) {
-                        allOcclude = false;
-                        break;
-                    }
+            if (level == null) return;
+
+            boolean allOcclude = true;
+            for (var d : net.minecraft.core.Direction.values()) {
+                BlockPos neighborPos = pos.relative(d);
+                if (!level.getBlockState(neighborPos).canOcclude()) {
+                    allOcclude = false;
+                    break;
                 }
-                if (allOcclude) return;
             }
+            if (allOcclude) return;
+
             registeredBlocks.put(pos, resource);
             blockLightCache.put(pos.asLong(), lightLevel);
-            if (level != null) {
-                ClientChunkCache chunkSource = level.getChunkSource();
-                LevelLightEngine lightingEngine = chunkSource.getLightEngine();
-                lightingEngine.checkBlock(pos);
-            }
+            LestoraDLMod.checkBlock(level, pos);
         } finally {
             lock.unlock();
         }
-    }
-
-    public static void removeAll() {
-        lock.lock();
-        try {
-            var level = Minecraft.getInstance().level;
-            for (var oldPos : registeredBlocks.entrySet()) {
-                if (level != null) {
-                    ClientChunkCache chunkSource = level.getChunkSource();
-                    LevelLightEngine lightingEngine = chunkSource.getLightEngine();
-                    lightingEngine.checkBlock(oldPos.getKey());
-                }
-            }
-            registeredBlocks.clear();
-        } finally {
-            lock.unlock();
-        }
-        refreshBlockLightCache();
     }
 
     public static void tryRemoveBlock(BlockPos pos) {
         lock.lock();
         try {
             registeredBlocks.remove(pos);
-            var level = Minecraft.getInstance().level;
-            if (level != null) {
-                ClientChunkCache chunkSource = level.getChunkSource();
-                LevelLightEngine lightingEngine = chunkSource.getLightEngine();
-                lightingEngine.checkBlock(pos);
-            }
+            blockLightCache.remove(pos.asLong());
         } finally {
             lock.unlock();
         }
+
         refreshBlockLightCache();
+        LestoraDLMod.checkBlock(Minecraft.getInstance().level, pos);
     }
 }

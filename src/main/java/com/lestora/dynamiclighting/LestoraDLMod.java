@@ -4,6 +4,8 @@ import com.lestora.config.LightConfig;
 import com.lestora.dynamiclighting.config.AlternateConfigHandler;
 import com.lestora.dynamiclighting.config.RealConfigHandler;
 import com.lestora.dynamiclighting.events.DLEvents;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -26,6 +28,16 @@ public class LestoraDLMod {
         else {
             getEntityLightLevel = AlternateConfigHandler.getMinLightLevelFunc();
             getBlockLightLevel = AlternateConfigHandler.getMaxLightLevelFunc();
+        }
+    }
+
+    public static void checkBlock(ClientLevel level, BlockPos... positions) {
+        if (level != null){
+            for (var pos : positions) {
+                if (pos != null) {
+                    level.getChunkSource().getLightEngine().checkBlock(pos);
+                }
+            }
         }
     }
 }
