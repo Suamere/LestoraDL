@@ -191,6 +191,8 @@ public class DLEvents {
             }
         }
 
+        LightingUpdateManager.pendingSubChunkScans.removeIf(scp -> !currentChunks.contains(scp.chunkPos));
+
         // Remove blocks for chunks that are beyond the player's render distance.
         for (ChunkPos oldChunk : previousChunks) {
             int dx = oldChunk.x - playerChunkX;
