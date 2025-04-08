@@ -81,6 +81,8 @@ public class DLEvents {
         if (DynamicBlockLighting.getEnabled() && LestoraDLMod.configLoaded) {
             TickDynamicBlocks(localPlayer);
         }
+
+        DynamicBlockLighting.tickCacheRefresh();
     }
 
     @SubscribeEvent

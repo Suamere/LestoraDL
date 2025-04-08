@@ -11,11 +11,19 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public final class DynamicBlockLighting {
+    private static boolean cacheDirty = false;
     private static boolean enabled = true;
     private static final Lock lock = new ReentrantLock();
     private static final ConcurrentHashMap<BlockPos, ResourceLocation> registeredBlocks = new ConcurrentHashMap<>();
     // Add these near your other static fields:
     private static final ConcurrentHashMap<Long, Integer> blockLightCache = new ConcurrentHashMap<>();
+
+    public static void tickCacheRefresh() {
+        if (cacheDirty) {
+            refreshBlockLightCache();
+            cacheDirty = false;
+        }
+    }
 
     // Refresh the cache when blocks update (e.g., after tryAddBlock/tryRemoveBlock):
     public static void refreshBlockLightCache() {
@@ -87,7 +95,8 @@ public final class DynamicBlockLighting {
             lock.unlock();
         }
 
-        refreshBlockLightCache();
+        cacheDirty = true;
+
         var level = Minecraft.getInstance().level;
         if (level != null) {
             // Update the removed position
