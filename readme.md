@@ -1,6 +1,12 @@
 # Lestora Dynamic Lights
 
-This is a standalone client mod that allows you to configure entities with light levels, as well as set the efficiency (tick update time).  Held entities and thrown entities will then emit that light level from the position wherever the entity is.
+This is a standalone client mod that allows items and blocks with light levels to dynamically emit light.  This could be when held, when throwing entities, or when placing entities and blocks.
+
+On the client-side mod, you can set the efficiency (tick update time).
+
+This mod will use default light levels as documented in Minecraft, let me know if I get one wrong as it's not exposed in code and I had to manually do it.
+
+This mod also allows you to optionally depend on Lestora Config, which will create at `config/lestora-lighting.toml` with default values, where you can add or update values.
 
 ## Features
 - **Usage:** Dynamically lights up the area while holding a glowing item, or if you throw an entity.
@@ -12,9 +18,9 @@ This is a standalone client mod that allows you to configure entities with light
 3. Launch Minecraft with the Forge profile.
 
 ## Commands
-- Use the command `/lestora dynamicLighting [0-100]` to set the efficiency.  1 is the best, 15 is similar to OptiFine, 100 is rediculously slow, lol.  0 effectively turns the mod off.
+- Use the command `/lestora dynamicLighting efficiency [0-100]` to set the efficiency.  1 is the best, 15 is similar to OptiFine, 100 is rediculously slow, lol.  0 effectively turns the mod off.
 - Use the command `/lestora dynamicLighting fixNearby` in case some artifact remains lit.  Report this so I can troubleshoot if it happens (It has only happened once to me and I can't figure out why).  This works in a 20 block radius from the player.
-- Use the command `/lestora dynamicLighting chunkDistance [0-10]` to set the chunk loading distance for Placed BLOCKS (beta).  So if your configuration has something like "minecraft:diamond_ore, 14", then this is how many chunk distance those blocks will emit light from the player (0 is off, 3 is recommended)
+- Use the command `/lestora dynamicLighting blocksEnabled [true/false]` true by default.  Determines if it should render custom block lighting defined in Lestora Config, such as Diamond Ore or whatever you want.
 
 ## Compatibility
 - **Minecraft Version:** 1.21.4

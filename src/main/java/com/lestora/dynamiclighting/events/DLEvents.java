@@ -24,13 +24,10 @@ import net.minecraft.world.level.block.piston.PistonHeadBlock;
 import net.minecraft.world.level.block.piston.PistonBaseBlock;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
-import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.level.BlockEvent;
-import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -69,6 +66,8 @@ public class DLEvents {
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+
         tickCounter++;
         var level = Minecraft.getInstance().level;
         var localPlayer = Minecraft.getInstance().player;
@@ -86,8 +85,8 @@ public class DLEvents {
 
     @SubscribeEvent
     public static void onClientTick2(TickEvent.ClientTickEvent event) {
-        if (!LestoraDLMod.configLoaded) return;
         if (event.phase != TickEvent.Phase.END) return;
+        if (!LestoraDLMod.configLoaded) return;
 
         for (Iterator<Map.Entry<FallingBlockEntity, BlockPos>> it = fallingBlockCache.entrySet().iterator(); it.hasNext();) {
             Map.Entry<FallingBlockEntity, BlockPos> entry = it.next();
@@ -250,6 +249,9 @@ public class DLEvents {
 
     @SubscribeEvent
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (!event.getLevel().isClientSide()) {
+            return;
+        }
         if (!LestoraDLMod.configLoaded) return;
         ResourceLocation rl = ForgeRegistries.BLOCKS.getKey(event.getPlacedBlock().getBlock());
         Integer lightLevel = (rl != null) ? LestoraDLMod.getBlockLightLevel.apply(rl) : null;
@@ -260,6 +262,9 @@ public class DLEvents {
 
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
+        if (!event.getLevel().isClientSide()) {
+            return;
+        }
         if (!LestoraDLMod.configLoaded) return;
         BlockPos pos = event.getPos();
         DynamicBlockLighting.tryRemoveBlock(pos);

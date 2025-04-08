@@ -24,7 +24,7 @@ public class DLCommands {
 
         registerFixNearby(root);
         registerEfficiency(root);
-        registerChunkDistance(root);
+        registerBlocksEnabled(root);
 
         event.getDispatcher().register(root);
     }
@@ -42,7 +42,7 @@ public class DLCommands {
         ));
     }
 
-    private static void registerChunkDistance(LiteralArgumentBuilder<CommandSourceStack> root) {
+    private static void registerBlocksEnabled(LiteralArgumentBuilder<CommandSourceStack> root) {
         root.then(Commands.literal("dynamicLighting")
                 .then(Commands.literal("blocksEnabled")
                         .then(Commands.argument("enabled", BoolArgumentType.bool())
@@ -74,7 +74,7 @@ public class DLCommands {
                                     for (int dz = -range; dz <= range; dz++)
                                         positions[index++] = playerPos.offset(dx, dy, dz);
 
-                            LestoraDLMod.checkBlock((ClientLevel) player.level(), positions);
+                            LestoraDLMod.checkBlockRemoval((ClientLevel) player.level(), positions);
                             return 1;
                         })
                 )
