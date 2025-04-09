@@ -154,30 +154,52 @@ public class DLEvents {
 
     private static int lastPlayerChunkX = Integer.MIN_VALUE;
     private static int lastPlayerChunkZ = Integer.MIN_VALUE;
+    private static int teleportDelay = 0;
+    private static boolean playerTeleported;
     private static void TickDynamicBlocks(LocalPlayer localPlayer) {
         if (tickCounter % 20 != 0) return;
+        if (teleportDelay > 0) {
+            teleportDelay--;
+            return;
+        }
 
         var playerPos = localPlayer.blockPosition();
         int playerChunkX = playerPos.getX() >> 4;
         int playerChunkZ = playerPos.getZ() >> 4;
 
-        // Early return if the player's chunk hasn't changed.
-        if (playerChunkX == lastPlayerChunkX && playerChunkZ == lastPlayerChunkZ) {
+        var forceMove = false;
+        if (playerTeleported) {
+            // If the player teleported then, after the teleportDelay countdown, if they haven't technically moved chunks yet,
+            // do this single "forceMove"
+            forceMove = true;
+            playerTeleported = false; // Their teleportation wait is over.
+        }
+        else {
+            playerTeleported = Math.abs(playerChunkX - lastPlayerChunkX) > 3 || Math.abs(playerChunkZ - lastPlayerChunkZ) > 3;
+        }
+
+        var playerMoved = forceMove || !(playerChunkX == lastPlayerChunkX && playerChunkZ == lastPlayerChunkZ);
+
+        lastPlayerChunkX = playerChunkX;
+        lastPlayerChunkZ = playerChunkZ;
+
+        if (!playerMoved) return;
+
+        if (playerTeleported) {
+            DLEvents.resetBlockChunkScans();
+            teleportDelay = 3;
             return;
         }
 
-        // Update last known chunk coordinates.
-        lastPlayerChunkX = playerChunkX;
-        lastPlayerChunkZ = playerChunkZ;
         int playerY = playerPos.getY();
 
-        var yChange = false;
+        boolean yChange = false;
         if (Math.abs(playerY - previousPlayerY) > 8) {
             yChange = true;
             previousPlayerY = playerY;
         }
 
-        // Retrieve the player's render distance (in chunks) and compute squared distance
+        // Retrieve the player's render distance (in chunks) and compute squared distance.
         int renderDistance = Minecraft.getInstance().options.renderDistance().get();
         int renderDistanceSq = renderDistance * renderDistance;
 
@@ -186,11 +208,13 @@ public class DLEvents {
         for (int dx = -renderDistance; dx <= renderDistance; dx++) {
             for (int dz = -renderDistance; dz <= renderDistance; dz++) {
                 if ((dx * dx + dz * dz) <= renderDistanceSq) {
-                    currentChunks.add(new ChunkPos(playerChunkX + dx, playerChunkZ + dz));
+                    ChunkPos cp = new ChunkPos(playerChunkX + dx, playerChunkZ + dz);
+                    currentChunks.add(cp);
                 }
             }
         }
 
+        // Remove sub-chunk scans for chunks no longer active.
         LightingUpdateManager.pendingSubChunkScans.removeIf(scp -> !currentChunks.contains(scp.chunkPos));
 
         // Remove blocks for chunks that are beyond the player's render distance.
@@ -211,6 +235,7 @@ public class DLEvents {
 
         previousChunks = currentChunks;
     }
+
 
     private static int previousPlayerY = Integer.MIN_VALUE;
 

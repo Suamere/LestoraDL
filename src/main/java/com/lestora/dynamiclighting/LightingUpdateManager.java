@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.lestora.dynamiclighting.models.SubChunkPos;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.entity.player.Player;
 import com.lestora.dynamiclighting.events.DLEvents;
@@ -43,16 +42,30 @@ public class LightingUpdateManager {
         double bestDistance = Double.MAX_VALUE;
         var level = Minecraft.getInstance().level;
         if (level == null) return null;
+
+        final int groundThreshold = 4;
         for (SubChunkPos scp : pendingSubChunkScans) {
-            // Only consider scp if the chunk is actually loaded.
             if (!level.hasChunk(scp.chunkPos.x, scp.chunkPos.z)) {
                 continue;
             }
             int dx = scp.chunkPos.x - playerChunkX;
             int dz = scp.chunkPos.z - playerChunkZ;
-            int verticalDiff = Math.abs((scp.startingY >> 4) - playerSubChunk);
             double horizontalDistSq = dx * dx + dz * dz;
+
+            // Compute vertical difference using sub-chunk indices.
+            int scpSubChunk = scp.startingY >> 4; // scp's sub-chunk index.
+            int verticalDiff = Math.abs(scpSubChunk - playerSubChunk);
+
+            // Base effective distance calculation.
             double effectiveDistance = horizontalDistSq + 3 * (verticalDiff * verticalDiff);
+
+            // Apply additional penalty for sub-chunks that are in a different vertical zone.
+            // For example, if the player is above ground and the sub-chunk is below ground, add a high penalty.
+            if (playerSubChunk > groundThreshold && scpSubChunk < groundThreshold) {
+                effectiveDistance += 1000;  // Large penalty.
+            } else if (playerSubChunk < groundThreshold && scpSubChunk >= groundThreshold) {
+                effectiveDistance += 1000;  // Likewise, if the player is underground and the chunk is above.
+            }
 
             if (effectiveDistance < bestDistance) {
                 bestDistance = effectiveDistance;
