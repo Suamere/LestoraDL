@@ -20,8 +20,9 @@ public class LightingUpdateManager {
         int minY = Math.max(-60, baseY - 3 * 16);
         int maxY = Math.min(320, baseY + 3 * 16);
 
-        for (int y = minY; y <= maxY; y += 16)
+        for (int y = minY; y <= maxY; y += 16){
             pendingSubChunkScans.add(new SubChunkPos(cp, y));
+        }
     }
 
     public static void processPendingScans(Player player) {
@@ -35,6 +36,14 @@ public class LightingUpdateManager {
             pendingSubChunkScans.remove(closest);
             DLEvents.scanChunk(closest);
         }
+    }
+
+    public static void UnregisterPending(Set<ChunkPos> currentChunks) {
+        pendingSubChunkScans.removeIf(scp -> !currentChunks.contains(scp.chunkPos));
+    }
+
+    public static void clearPending() {
+        pendingSubChunkScans.clear();
     }
 
     private static @Nullable SubChunkPos getClosest(int playerChunkX, int playerChunkZ, int playerSubChunk) {

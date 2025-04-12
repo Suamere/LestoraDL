@@ -145,11 +145,8 @@ public class DLEvents {
     }
 
     public static void resetBlockChunkScans() {
-        for (ChunkPos oldChunk : previousChunks) {
-            removeBlocksInChunk(oldChunk.x, oldChunk.z);
-        }
         previousChunks.clear();
-        LightingUpdateManager.pendingSubChunkScans.clear();
+        LightingUpdateManager.clearPending();
     }
 
     private static int lastPlayerChunkX = Integer.MIN_VALUE;
@@ -215,16 +212,16 @@ public class DLEvents {
         }
 
         // Remove sub-chunk scans for chunks no longer active.
-        LightingUpdateManager.pendingSubChunkScans.removeIf(scp -> !currentChunks.contains(scp.chunkPos));
-
-        // Remove blocks for chunks that are beyond the player's render distance.
-        for (ChunkPos oldChunk : previousChunks) {
+        LightingUpdateManager.UnregisterPending(currentChunks);
+        previousChunks.removeIf(oldChunk -> {
             int dx = oldChunk.x - playerChunkX;
             int dz = oldChunk.z - playerChunkZ;
-            if ((dx * dx + dz * dz) > renderDistanceSq) {
+            if ((dx * dx + dz * dz) >= renderDistanceSq) {
                 removeBlocksInChunk(oldChunk.x, oldChunk.z);
+                return true;
             }
-        }
+            return false;
+        });
 
         // Queue up new chunks that weren't previously scanned.
         for (ChunkPos cp : currentChunks) {
@@ -336,7 +333,6 @@ public class DLEvents {
         }
     }
 
-
     // Helper method to remove blocks in a given chunk
     private static void removeBlocksInChunk(int chunkX, int chunkZ) {
         int startX = chunkX << 4, endX = startX + 15;
@@ -348,7 +344,6 @@ public class DLEvents {
         }
     }
 
-    static int scanCount = 0;
     static Map<SubChunkPos, Integer> sky = new HashMap<>();
     public static void scanChunk(SubChunkPos scp) {
         var existing = sky.get(scp);
@@ -378,12 +373,11 @@ public class DLEvents {
                         }
                     }
                 }
-                if (allAir){
-                    sky.put(scp, scp.startingY);
+                if (allAir && y > 64){
+                    sky.put(new SubChunkPos(scp.chunkPos, scp.startingY + 16), scp.startingY + 16);
                     break;
                 }
             }
-            scanCount++;
         } catch (Exception ignored) { }
     }
 }
